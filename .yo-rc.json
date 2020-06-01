@@ -1,0 +1,21 @@
+{
+  "generator-sap-partner-eng": {
+    "package_version": "0.2.14",
+    "project_name": "hdbcds2capcds",
+    "app_name": "h2c",
+    "app_desc": "HDB style cds -> CAP style cds",
+    "router_name": "h2c-app",
+    "domain_name": "cfapps.us10.hana.ondemand.com",
+    "router_path": "app",
+    "database_path": "db",
+    "services_path": "srv",
+    "uaa_res_name": "h2c-uaa",
+    "uaa_svc_name": "H2C_UAA",
+    "database_name": "h2c-hdb",
+    "db_schema_name": "H2C_DB",
+    "hdi_res_name": "h2c-hdi",
+    "hdi_svc_name": "H2C_HDI",
+    "sampledata_provided": true,
+    "hanacloud_compatible": false
+  }
+}

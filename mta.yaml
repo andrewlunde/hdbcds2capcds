@@ -1,0 +1,148 @@
+## Generated mta.yaml based on yo sap-partner-eng version 0.2.14
+## appName = h2c
+## language=nodejs; multiTenant=false
+## approuter=h2c-app
+_schema-version: '3.1'
+ID: h2c
+version: 0.0.1
+description: HDB style cds -&gt; CAP style cds
+parameters:
+   enable-parallel-deployments: true
+  
+  
+#build-parameters:
+#  before-all:
+#   - builder: custom
+#     commands:
+#      - npm install
+#      - npx cds build
+
+modules:
+
+### New Modules Here ###
+
+# cf push h2c-hdb -p db -k 512M -m 512M -u none ; sleep 60 ; cf stop h2c-hdb
+ - name: h2c-hdb
+   type: hdb
+   path: db
+   parameters:
+      memory: 512M
+      disk-quota: 512M
+      #host: ${org}-${space}-h2c-hdb
+      #domain: cfapps.us10.hana.ondemand.com
+   requires:
+    - name: h2c-hdi
+
+# cf push h2c-app -p app -n h2c-app -d cfapps.us10.hana.ondemand.com -k 256M -m 256M
+ - name: h2c-app
+   type: html5
+   path: app
+   build-parameters:
+      ignore: ["node_modules/"]
+   parameters:
+      #host: ${org}-${space}-h2c-app
+      #domain: cfapps.us10.hana.ondemand.com
+      #routes:
+      #  - route: h2c-app-${space}-${app-name}.${default-domain}
+      disk-quota: 256M
+      memory: 256M
+   provides:
+    - name: Router_api
+      properties:
+         url: ${default-url}
+         application: ${app-name}
+# CDS-MTX
+   requires:
+   # cf bind-service h2c-app H2C_UAA
+    - name: h2c-uaa
+   ### New Destinations Here ###
+
+resources:
+
+# cf create-service xsuaa application H2C_UAA -c ./cds-security.json
+ - name: h2c-uaa
+   type: org.cloudfoundry.managed-service
+   requires:
+    - name: Router_api
+   properties:
+      XSAPPNAME: ${xsuaa-app}
+   parameters:
+      # Re-run the following command after changing any @(requires: []) definitions in srv/*.cds
+      # Run this from the root of the project and uncomment the path:
+      # cds compile srv/ --to xsuaa,json > cds-security.json
+      #path: ./cds-security.json
+      # The combination of path: and config.scopes: Doesn't seem work.  Use one or the other.
+      # cds compile srv/ --to xsuaa,yaml and make sure the config: below matches
+      #path: ./cds-security.json
+      #path: ./xs-security.json
+      service: xsuaa
+      service-plan: application
+      service-name: H2C_UAA
+      xsuaa-app: ${space}-~{Router_api/application}
+      # Define within config what used to be in the xs-security.json file.  path: now pulls in cds scopes/role templates
+      # Convert with https://www.json2yaml.com/
+      # https://github.wdf.sap.corp/pages/cap/guides/authorization#role-assignments-with-xsuaa
+      config:
+         xsappname: ${xsuaa-app}
+         ### tenant-mode
+         tenant-mode: dedicated
+         description: Security profile of the h2c application
+         scopes:
+          - name: "$XSAPPNAME.Callback"
+            description: With this scope set, the callbacks for tenant onboarding, offboarding and getDependencies can be called.
+            grant-as-authority-to-apps: 
+             - "$XSAPPNAME(application,sap-provisioning,tenant-onboarding)"
+          - name: "$XSAPPNAME.Administrator"
+            description: Administrate the application
+          - name: "$XSAPPNAME.User"
+            description: Use the application
+         role-templates:
+          - name: Administrator
+            description: Administrator
+            scope-references:
+             - "$XSAPPNAME.Administrator"
+          - name: User
+            description: User
+            scope-references:
+             - "$XSAPPNAME.User"
+         oauth2-configuration:
+            redirect-uris: 
+             - "http*://*.cfapps.us10.hana.ondemand.com/**"
+
+# CAP-MTX Managed HANA (Internal Service Manager)
+# - name: h2c-mgd
+#   type: org.cloudfoundry.managed-service
+#   requires:
+#    - name: h2c_services_api
+#   parameters:
+#      service-plan: hdi-shared
+#      service: managed-hana
+#      service-name: h2c_MGD
+
+# CAP-MXT Registration
+# - name: h2c-reg
+#   type: org.cloudfoundry.managed-service
+#   requires:
+#    - name: h2c-uaa
+#   parameters:
+#    service: saas-registry
+#    service-plan: application
+#    service-name: h2c_REG
+#    config:
+#      xsappname: ~{h2c-uaa/XSAPPNAME}
+#      appName: h2c
+#      displayName: h2c
+#      description: 'h2c Multitenant App'
+#      category: 'h2c Category'
+#      appUrls:
+#         onSubscription: https://h2c-srv-${space}.cfapps.us10.hana.ondemand.com/mtx/v1/provisioning/tenant/{tenantId}
+
+### New Resources Here ###
+
+ - name: h2c-hdi
+   type: com.sap.xs.hdi-container
+   parameters:
+      service-name: H2C_HDI
+      config:
+         schema: H2C_DB
+
